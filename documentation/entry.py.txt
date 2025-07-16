@@ -1,0 +1,7 @@
+this is the main startup script that is called when the application starts up
+
+
+
+release_build this variable will reference a file in program files/data.
+This will be one when this is designed for public release and zero when 
+it is designed for testing.
