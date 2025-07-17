@@ -22,4 +22,8 @@ def generate_qr_code(data: str, save_path: str):
     print(f"QR code saved to: {save_path}")
 
 
-generate_qr_code("", "test.png")
+
+x = input("Will the meat be created by hand(H) or automated(A)?").upper
+
+if (x=="H"):
+    print("H")

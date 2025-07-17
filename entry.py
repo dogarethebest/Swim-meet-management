@@ -20,7 +20,7 @@ print(f"build ID:{build_id}")
 print("would you like to create a new meet?")
 print("or would you like to resume or start a existing meet?")
 
-x = input("(yes for new meet no for existing meet)")
+x = input("(yes for new meet no for existing meet)").lower
 
 
 if(x == "yes"):
