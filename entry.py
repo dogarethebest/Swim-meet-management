@@ -25,3 +25,5 @@ x = input("(yes for new meet no for existing meet)").lower
 
 if(x == "yes"):
     print("Creating meet")
+elif(x=="no"):
+    print("resuming existing meet")

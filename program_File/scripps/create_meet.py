@@ -20,10 +20,9 @@ def generate_qr_code(data: str, save_path: str):
     # Save to file
     img.save(save_path)
     print(f"QR code saved to: {save_path}")
-
-
-
 x = input("Will the meat be created by hand(H) or automated(A)?").upper
 
 if (x=="H"):
-    print("H")
+    print("meat will be created by hand")
+elif(x == "A"):
+    print("meet will be created automatically through script")
