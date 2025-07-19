@@ -2,14 +2,20 @@ import qrcode
 import sqlite3
 import os
 from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M, ERROR_CORRECT_Q, ERROR_CORRECT_H
+import hashlib
+import time
 
+def generate_time_based_id(input_text: str) -> str:
+    timestamp = str(time.time())
+    combined = input_text + timestamp
+    return hashlib.sha256(combined.encode('utf-8')).hexdigest()[:16]
 def generate_qr_code(data: str, save_path: str):
 
     # Create QR code object
     qr = qrcode.QRCode(
-        version=15,
+        version=10,
         error_correction=ERROR_CORRECT_H,
-        box_size=10,
+        box_size=2,
         border=4,
     )
 
@@ -32,6 +38,8 @@ def initialize_database_at_path(db_path: str):
     CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         gender TEXT NOT NULL CHECK(gender IN ('Boys', 'Girls')),
+        age_min INTEGER NOT NULL,
+        age_max INTEGER NOT NULL,
         distance INTEGER NOT NULL,
         stroke TEXT NOT NULL
     );
@@ -62,16 +70,26 @@ def initialize_database_at_path(db_path: str):
 
     conn.commit()
     conn.close()
-def create_event(db_path: str, gender: str, distance: int, stroke: str) -> int:
+def create_event(db_path: str, gender: str, age_min: int, age_max: int, distance: int, stroke: str) -> int:
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO events (gender, distance, stroke)
-        VALUES (?, ?, ?)
-    """, (gender, distance, stroke))
+        INSERT INTO events (gender, age_min, age_max, distance, stroke)
+        VALUES (?, ?, ?, ?, ?)
+    """, (gender, age_min, age_max, distance, stroke))
     conn.commit()
     event_id = cursor.lastrowid
     conn.close()
+
+    # Generate QR code with full event info
+    age_range = f"{age_min}-{age_max}"
+    
+    qr_data = f"Event ID: {event_id}, {gender}, {age_range}, {distance} yd, {stroke}"
+    save_path = f"Active_meet/qr_event_{event_id}.png"
+    x = generate_time_based_id(qr_data)
+    qr_data = qr_data + (f", Event uuid:{x}")
+    generate_qr_code(qr_data, save_path)
+
     return event_id
 def add_heat(db_path: str, event_id: int, heat_num: int) -> int:
     conn = sqlite3.connect(db_path)
@@ -120,3 +138,6 @@ conn = sqlite3.connect(db_path)
 conn.close()
 print("meet will be created automatically through script")
 initialize_database_at_path(db_path)
+
+create_event(db_path, "Boys", 9,10, 50,"backstroke")
+print (get_all_events(db_path))
