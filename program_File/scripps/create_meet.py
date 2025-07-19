@@ -129,13 +129,7 @@ def update_lane_times(db_path: str, lane_id: int, timer1: float, timer2: float, 
     conn.close()
 
 
-def get_all_events(db_path: str) -> list:
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM events")
-    events = cursor.fetchall()
-    conn.close()
-    return events
+
 def get_all_events(db_path: str):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -162,11 +156,14 @@ def get_swimmers_in_heat(db_path: str, heat_id: int):
     swimmers = cursor.fetchall()
     conn.close()
     return swimmers
+
+
 def get_fastest_swimmer_in_event(db_path: str, event_id: int):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT swimmer_name, total_time, heats.heat_num, lanes.lane_num
+        SELECT swimmer_name, total_time, heats.heat_num, lanes.lane_num,
+               timer1_time, timer2_time, timer3_time
         FROM lanes
         JOIN heats ON lanes.heat_id = heats.id
         WHERE heats.event_id = ? AND total_time IS NOT NULL
@@ -176,7 +173,48 @@ def get_fastest_swimmer_in_event(db_path: str, event_id: int):
     result = cursor.fetchone()
     conn.close()
     return result
-
+def list_all_swimmers(db_path: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT swimmer_name, heats.heat_num, lanes.lane_num, events.id AS event_id,
+               events.stroke, timer1_time, timer2_time, timer3_time, total_time
+        FROM lanes
+        JOIN heats ON lanes.heat_id = heats.id
+        JOIN events ON heats.event_id = events.id
+        ORDER BY event_id, heats.heat_num, lanes.lane_num
+    """)
+    swimmers = cursor.fetchall()
+    conn.close()
+    return swimmers
+def list_swimmers_in_event(db_path: str, event_id: int):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT swimmer_name, heats.heat_num, lanes.lane_num,
+               timer1_time, timer2_time, timer3_time, total_time
+        FROM lanes
+        JOIN heats ON lanes.heat_id = heats.id
+        WHERE heats.event_id = ?
+        ORDER BY heats.heat_num, lanes.lane_num
+    """, (event_id,))
+    swimmers = cursor.fetchall()
+    conn.close()
+    return swimmers
+def get_event_results(db_path: str, event_id: int):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT swimmer_name, heats.heat_num, lanes.lane_num,
+               timer1_time, timer2_time, timer3_time, total_time
+        FROM lanes
+        JOIN heats ON lanes.heat_id = heats.id
+        WHERE heats.event_id = ? AND total_time IS NOT NULL
+        ORDER BY total_time ASC
+    """, (event_id,))
+    results = cursor.fetchall()
+    conn.close()
+    return results
 
 
 # Define your path — change this to your preferred location
@@ -202,7 +240,7 @@ def generate_simple_test_data(db_path: str):
 
     swimmer_id = 1
 
-    for i in range(100):  # 3 events
+    for i in range(10):  # 3 events
         gender = genders[i % len(genders)]
         age_min, age_max = age_ranges[i % len(age_ranges)]
         distance = 50 if i % 2 == 0 else 100
@@ -222,14 +260,15 @@ def generate_simple_test_data(db_path: str):
                 t2 = round(random.uniform(25.0, 45.0), 2)
                 t3 = round(random.uniform(25.0, 45.0), 2)
 
+
                 update_lane_times(db_path, lane_id, t1, t2, t3)
 
                 swimmer_id += 1
 
     print("Simple test data generated.")
 
-# Call the function
 generate_simple_test_data(db_path)
-
+print(list_swimmers_in_event(db_path,1))
+get_event_results(db_path,1)
 
 print (get_all_events(db_path))
