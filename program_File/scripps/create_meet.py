@@ -4,7 +4,7 @@ import os
 from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M, ERROR_CORRECT_Q, ERROR_CORRECT_H
 import hashlib
 import time
-
+                                                                                              
 def generate_time_based_id(input_text: str) -> str:
     timestamp = str(time.time())
     combined = input_text + timestamp
@@ -58,12 +58,12 @@ def initialize_database_at_path(db_path: str):
     CREATE TABLE IF NOT EXISTS lanes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         heat_id INTEGER NOT NULL,
-        lane_num INTEGER NOT NULL CHECK(lane_num BETWEEN 1 AND 7),
+        lane_num INTEGER NOT NULL CHECK(lane_num BETWEEN 1 AND 8),
         swimmer_name TEXT NOT NULL,
-        timer1_time REAL NOT NULL,
-        timer2_time REAL NOT NULL,
-        timer3_time REAL NOT NULL,
-        total_time REAL NOT NULL,
+        timer1_time REAL ,
+        timer2_time REAL ,
+        timer3_time REAL ,
+        total_time REAL ,
         FOREIGN KEY (heat_id) REFERENCES heats(id)
     );
     """)
@@ -102,9 +102,10 @@ def add_heat(db_path: str, event_id: int, heat_num: int) -> int:
     heat_id = cursor.lastrowid
     conn.close()
     return heat_id
-def add_swimmer_to_lane(db_path: str, heat_id: int, lane_num: int, swimmer_name: str,
-                        timer1: float, timer2: float, timer3: float) -> int:
-    total_time = round((timer1 + timer2 + timer3) / 3, 3)
+def add_swimmer_to_lane(db_path: str, heat_id: int, lane_num: int, swimmer_name: str) -> int:
+    # No timers provided yet, so set to None (which inserts NULL in SQLite)
+    timer1 = timer2 = timer3 = total_time = None
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
@@ -115,6 +116,19 @@ def add_swimmer_to_lane(db_path: str, heat_id: int, lane_num: int, swimmer_name:
     lane_id = cursor.lastrowid
     conn.close()
     return lane_id
+def update_lane_times(db_path: str, lane_id: int, timer1: float, timer2: float, timer3: float):
+    total_time = round((timer1 + timer2 + timer3) / 3, 3)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE lanes
+        SET timer1_time = ?, timer2_time = ?, timer3_time = ?, total_time = ?
+        WHERE id = ?
+    """, (timer1, timer2, timer3, total_time, lane_id))
+    conn.commit()
+    conn.close()
+
+
 def get_all_events(db_path: str) -> list:
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -122,6 +136,46 @@ def get_all_events(db_path: str) -> list:
     events = cursor.fetchall()
     conn.close()
     return events
+def get_all_events(db_path: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM events")
+    events = cursor.fetchall()
+    conn.close()
+    return events
+def get_heats_for_event(db_path: str, event_id: int):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM heats WHERE event_id = ?", (event_id,))
+    heats = cursor.fetchall()
+    conn.close()
+    return heats
+def get_swimmers_in_heat(db_path: str, heat_id: int):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT lane_num, swimmer_name, timer1_time, timer2_time, timer3_time, total_time
+        FROM lanes
+        WHERE heat_id = ?
+        ORDER BY lane_num
+    """, (heat_id,))
+    swimmers = cursor.fetchall()
+    conn.close()
+    return swimmers
+def get_fastest_swimmer_in_event(db_path: str, event_id: int):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT swimmer_name, total_time, heats.heat_num, lanes.lane_num
+        FROM lanes
+        JOIN heats ON lanes.heat_id = heats.id
+        WHERE heats.event_id = ? AND total_time IS NOT NULL
+        ORDER BY total_time ASC
+        LIMIT 1
+    """, (event_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result
 
 
 
@@ -139,5 +193,43 @@ conn.close()
 print("meet will be created automatically through script")
 initialize_database_at_path(db_path)
 
-create_event(db_path, "Boys", 9,10, 50,"backstroke")
+import random
+
+def generate_simple_test_data(db_path: str):
+    genders = ["Boys", "Girls"]
+    strokes = ["freestyle", "backstroke", "breaststroke"]
+    age_ranges = [(9, 10), (11, 12), (13, 14)]
+
+    swimmer_id = 1
+
+    for i in range(100):  # 3 events
+        gender = genders[i % len(genders)]
+        age_min, age_max = age_ranges[i % len(age_ranges)]
+        distance = 50 if i % 2 == 0 else 100
+        stroke = strokes[i % len(strokes)]
+
+        event_id = create_event(db_path, gender, age_min, age_max, distance, stroke)
+
+        for heat_num in range(1, 5):  # 1 heat per event
+            heat_id = add_heat(db_path, event_id, heat_num)
+
+            for lane_num in range(1, 9):  # 8 lanes
+                swimmer_name = f"Swimmer {swimmer_id}"
+                lane_id = add_swimmer_to_lane(db_path, heat_id, lane_num, swimmer_name)
+
+                # Generate random timer values (25.00 to 45.00 seconds)
+                t1 = round(random.uniform(25.0, 45.0), 2)
+                t2 = round(random.uniform(25.0, 45.0), 2)
+                t3 = round(random.uniform(25.0, 45.0), 2)
+
+                update_lane_times(db_path, lane_id, t1, t2, t3)
+
+                swimmer_id += 1
+
+    print("Simple test data generated.")
+
+# Call the function
+generate_simple_test_data(db_path)
+
+
 print (get_all_events(db_path))
