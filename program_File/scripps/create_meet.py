@@ -258,49 +258,101 @@ def get_swimmer_name_from_lane(db_path: str, lane_id: int) -> str | None:
     conn.close()
 
     return result[0] if result else None
+def get_heat_number_from_id(db_path: str, heat_id: int) -> int | None:
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT heat_num FROM heats
+        WHERE id = ?
+    """, (heat_id,))
+    result = cursor.fetchone()
+    conn.close()
+
+    return result[0] if result else None
+def get_number_of_heats_for_event(db_path: str, event_id: int) -> int:
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COUNT(*) FROM heats
+        WHERE event_id = ?
+    """, (event_id,))
+    result = cursor.fetchone()
+    conn.close()
+
+    return result[0] if result else 0
+def get_total_number_of_events(db_path: str) -> int:
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM events")
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else 0
+
 
 def rendered_timesheets(db_path: str, event_id: int):
+    qr_size = 125
+    bg_width = 1000
+    bg_height = 400
 
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    font_path = os.path.join(base_dir, 'Data', 'arial.ttf')
 
+    try:
+        font = ImageFont.truetype(font_path, 30)  # Bigger font size for clarity
+    except IOError:
+        font = ImageFont.load_default()
+        print("Warning: 'arial.ttf' font not found, using default font.")
 
-    bg_width = 1000     # width of the white background
-    bg_height = 600    # height of the white background
-    qr_size = 125      # size to resize the QR code
-    Lane_ID = 1
-    
-    
-    
-    # Open and resize QR code
-    qr_code = Image.open(f"Active_meet/qr_code/lane/1.png").convert("RGBA")
-    qr_code = qr_code.resize((qr_size, qr_size))
+    margin_left = 30
+    margin_top = 20
+    line_spacing = 50  # vertical space between lines
 
-    # Create a white background box
-    background = Image.new("RGBA", (bg_width, bg_height), (255, 255, 255, 255))  # white box
-    
-    line_y = qr_size + 15
+    for heat in get_heats_for_event(db_path, event_id):
+        heat_id = heat[0]
+        heat_num = heat[2]
 
-    draw = ImageDraw.Draw(background)
-    draw.line([(0, line_y), (bg_width, line_y)], fill=(0, 0, 0), width=2)
+        swimmers = get_swimmers_in_heat(db_path, heat_id)
 
-    swimmer_name = get_swimmer_name_from_lane(db_path,Lane_ID)
+        for swimmer in swimmers:
+            lane_num, swimmer_name, t1, t2, t3, total = swimmer
 
-    font = ImageFont.load_default()
-    draw.text((qr_size + 15+10,100), swimmer_name, fill=(0, 0, 0), font=font)
+            lane_id = get_lane_id_by_heat_and_lane(db_path, heat_id, lane_num)
+            if not lane_id:
+                continue
 
-    # Position to center the QR code
-    x = (15)
-    y = (15)
+            qr_path = f"Active_meet/qr_code/lane/{lane_id}.png"
+            if not os.path.exists(qr_path):
+                continue
 
-    # Paste the QR code onto the white background
-    background.paste(qr_code, (x, y), qr_code)  # third arg = transparency mask
-    
-   
-    os.makedirs(os.path.dirname(f"Active_meet/Time_sheets/{event_id}/{Lane_ID}/,"), exist_ok=True)
-    # Save the final stacked image
-    background.save(f"Active_meet/Time_sheets/{event_id}/{Lane_ID}qr_on_white_box.png")
+            qr_code = Image.open(qr_path).convert("RGBA").resize((qr_size, qr_size))
+            background = Image.new("RGBA", (bg_width, bg_height), (255, 255, 255, 255))
+            draw = ImageDraw.Draw(background)
 
+            # Draw the QR code on left top
+            background.paste(qr_code, (15, 15), qr_code)
 
+            # Draw header texts
+            margin_left_2 = margin_left + qr_size
+            draw.text((margin_left_2, margin_top), f"Swimmer: {swimmer_name}", fill=(0, 0, 0), font=font)
+            draw.text((margin_left_2, margin_top + line_spacing), f"Event ID: {event_id} | Heat: {heat_num} | Lane: {lane_num}", fill=(0, 0, 0), font=font)
 
+            # Draw a line below header
+            line_y = margin_top + line_spacing * 2 - 10
+
+            # Starting point for timer lines (below header and line)
+            times_start_y = line_y + 30
+
+            # Draw labels and blank lines for timers
+            draw.text((margin_left, times_start_y), "Timer 1: ____________________", fill=(0, 0, 0), font=font)
+            draw.text((margin_left, times_start_y + line_spacing), "Timer 2: ____________________", fill=(0, 0, 0), font=font)
+            draw.text((margin_left, times_start_y + 2 * line_spacing), "Timer 3: ____________________", fill=(0, 0, 0), font=font)
+            draw.text((margin_left, times_start_y + 3 * line_spacing), "Total:   ____________________", fill=(0, 0, 0), font=font)
+
+            output_dir = f"Active_meet/Time_sheets/{event_id}/{heat_num}"
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, f"lane_{lane_num}_timesheet.png")
+            background.save(output_path)
+            print(f"Saved: {output_path}")
 
 # Define your path — change this to your preferred location
 db_path = "Active_meet/swim_meet.db"
@@ -311,7 +363,7 @@ os.makedirs(os.path.dirname(db_path), exist_ok=True)
 # Connect to (and create) the database
 conn = sqlite3.connect(db_path)
 
-# Now the file /Users/nicholaskitt/Documents/swim_meet/my_meet.db exists
+
 conn.close()
 print("meet will be created automatically through script")
 initialize_database_at_path(db_path)
@@ -325,7 +377,7 @@ def generate_simple_test_data(db_path: str):
 
     swimmer_id = 1
 
-    for i in range(10):  # 3 events
+    for i in range(100):  # 3 events
         gender = genders[i % len(genders)]
         age_min, age_max = age_ranges[i % len(age_ranges)]
         distance = 50 if i % 2 == 0 else 100
@@ -333,24 +385,21 @@ def generate_simple_test_data(db_path: str):
 
         event_id = create_event(db_path, gender, age_min, age_max, distance, stroke)
 
-        for heat_num in range(1, 5):  # 1 heat per event
+        for heat_num in range(1, 6):  # 1 heat per event
             heat_id = add_heat(db_path, event_id, heat_num)
 
             for lane_num in range(1, 9):  # 8 lanes
                 swimmer_name = f"Swimmer {swimmer_id}"
                 lane_id = add_swimmer_to_lane(db_path, heat_id, lane_num, swimmer_name)
 
-                # Generate random timer values (25.00 to 45.00 seconds)
-                t1 = round(random.uniform(25.0, 45.0), 2)
-                t2 = round(random.uniform(25.0, 45.0), 2)
-                t3 = round(random.uniform(25.0, 45.0), 2)
-
-
-                update_lane_times(db_path, lane_id, t1, t2, t3)
-
                 swimmer_id += 1
 
     print("Simple test data generated.")
-
 generate_simple_test_data(db_path)
-rendered_timesheets(db_path,1)
+
+
+x = get_total_number_of_events(db_path)
+y = 1
+for x in range(1, x + 1):
+    rendered_timesheets(db_path,y)
+    y = y+1
