@@ -1,11 +1,11 @@
 import qrcode
 import sqlite3
 import os
-from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M, ERROR_CORRECT_Q, ERROR_CORRECT_H
+from qrcode.constants import ERROR_CORRECT_H
 import hashlib
 import time
 from PIL import ImageDraw ,ImageFont ,Image
-import random
+
 
                                                                                               
 def generate_time_based_id(input_text: str) -> str:
@@ -31,7 +31,6 @@ def generate_qr_code(data: str, save_path: str):
     # Save to file
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     img.save(save_path)
-    print(f"QR code saved to: {save_path}")
 def initialize_database_at_path(db_path: str):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
@@ -102,8 +101,8 @@ def add_heat(db_path: str, event_id: int, heat_num: int) -> int:
     conn.commit()
     heat_id = cursor.lastrowid
     conn.close()
-
-    qr_data = f"Event ID: {event_id}, heat Id:{heat_id}"
+    heat_number=get_heat_number_from_id(db_path,heat_id)
+    qr_data = f"Event ID: {event_id}, heat Id:{heat_id},heat number:{heat_number}"
     save_path = f"Active_meet/qr_code/heat/{heat_id}.png"
     generate_qr_code(qr_data, save_path)
 
@@ -122,8 +121,9 @@ def add_swimmer_to_lane(db_path: str, heat_id: int, lane_num: int, swimmer_name:
     lane_id = cursor.lastrowid
     conn.close()
 
+    heat_number=get_heat_number_from_id(db_path,heat_id)
     event_id = get_event_id_from_heat(db_path, heat_id)
-    qr_data = f"Event ID: {event_id}, heat Id:{heat_id},lane num:{lane_num} lane id: {lane_id}"
+    qr_data = f"Event ID: {event_id}, heat Id:{heat_id},heat number:{heat_number},lane num:{lane_num} lane id: {lane_id}"
     save_path = f"Active_meet/qr_code/lane/{lane_id}.png"
 
     generate_qr_code(qr_data, save_path)
@@ -288,7 +288,6 @@ def get_total_number_of_events(db_path: str) -> int:
     conn.close()
     return result[0] if result else 0
 
-
 def rendered_timesheets(db_path: str, event_id: int):
     qr_size = 125
     bg_width = 1000
@@ -352,23 +351,6 @@ def rendered_timesheets(db_path: str, event_id: int):
             os.makedirs(output_dir, exist_ok=True)
             output_path = os.path.join(output_dir, f"lane_{lane_num}_timesheet.png")
             background.save(output_path)
-            print(f"Saved: {output_path}")
-
-# Define your path — change this to your preferred location
-db_path = "Active_meet/swim_meet.db"
-
-# Ensure the directory exists
-os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-# Connect to (and create) the database
-conn = sqlite3.connect(db_path)
-
-
-conn.close()
-print("meet will be created automatically through script")
-initialize_database_at_path(db_path)
-
-
 
 def generate_simple_test_data(db_path: str):
     genders = ["Boys", "Girls"]
@@ -395,6 +377,24 @@ def generate_simple_test_data(db_path: str):
                 swimmer_id += 1
 
     print("Simple test data generated.")
+
+
+# Define your path — change this to your preferred location
+db_path = "Active_meet/swim_meet.db"
+
+# Ensure the directory exists
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+# Connect to (and create) the database
+conn = sqlite3.connect(db_path)
+
+
+conn.close()
+initialize_database_at_path(db_path)
+
+
+
+
 generate_simple_test_data(db_path)
 
 
@@ -403,3 +403,4 @@ y = 1
 for x in range(1, x + 1):
     rendered_timesheets(db_path,y)
     y = y+1
+print("done")
