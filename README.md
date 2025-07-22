@@ -3,4 +3,4 @@ This is a project I’m working on that will allow you to manage and run a swim 
 
 
 
-July 19 2025 backend finished initial beta finalized working prototype
+July 19 2025 backend prototype 1
