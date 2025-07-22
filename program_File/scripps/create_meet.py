@@ -5,7 +5,7 @@ from qrcode.constants import ERROR_CORRECT_H
 import hashlib
 import time
 from PIL import ImageDraw ,ImageFont ,Image
-
+import random
 
                                                                                               
 def generate_time_based_id(input_text: str) -> str:
@@ -287,8 +287,22 @@ def get_total_number_of_events(db_path: str) -> int:
     result = cursor.fetchone()
     conn.close()
     return result[0] if result else 0
+def list_all_info(db_path: str):
+    for x in range(1, y + 1):
+        print(f"Event {x}:")
+        print(get_heats_for_event(db_path, x))
+        print(get_fastest_swimmer_in_event(db_path, x))
+        print(list_swimmers_in_event(db_path, x))
+        print(get_event_results(db_path, x))
+        print("\n")
+    print("All swimmers in the database:")
+    swimmers = list_all_swimmers(db_path)
+    for swimmer in swimmers:
+        print(swimmer)
 
-def rendered_timesheets(db_path: str, event_id: int):
+
+
+def rendered_a_timesheets(db_path: str, event_id: int):
     qr_size = 125
     bg_width = 1000
     bg_height = 400
@@ -351,32 +365,59 @@ def rendered_timesheets(db_path: str, event_id: int):
             os.makedirs(output_dir, exist_ok=True)
             output_path = os.path.join(output_dir, f"lane_{lane_num}_timesheet.png")
             background.save(output_path)
+def rendered_all_timesheets(db_path: str):
+    number_of_events = get_total_number_of_events(db_path)
+    x = number_of_events
+    y = 1
+    for x in range(1, x + 1):
+        rendered_a_timesheets(db_path,y)
+        percent = (y / (number_of_events))  # Calculate percentage of completion
+        percent = round(percent * 100, 2)
+        print(f"Rendering timesheets for event {y} of {number_of_events}:")
+        print(f"{percent} %")
+        y += 1
+    print("done") 
 
-def generate_simple_test_data(db_path: str):
+def random_swimmer_name():
+    first_names = [
+        "Liam", "Olivia", "Noah", "Emma", "Elijah", "Ava",
+        "James", "Sophia", "Benjamin", "Isabella", "Lucas", "Mia"
+    ]
+    last_names = [
+        "Smith", "Johnson", "Williams", "Brown", "Jones",
+        "Garcia", "Miller", "Davis", "Wilson", "Martinez", "Lee", "Clark"
+    ]
+    return f"{random.choice(first_names)} {random.choice(last_names)}"
+
+def generate_realistic_test_data(db_path: str, num_events=30):
     genders = ["Boys", "Girls"]
-    strokes = ["freestyle", "backstroke", "breaststroke"]
+    strokes = ["freestyle", "backstroke", "breaststroke", "butterfly"]
     age_ranges = [(9, 10), (11, 12), (13, 14)]
+    distances = [50, 100]
 
     swimmer_id = 1
 
-    for i in range(100):  # 3 events
-        gender = genders[i % len(genders)]
-        age_min, age_max = age_ranges[i % len(age_ranges)]
-        distance = 50 if i % 2 == 0 else 100
-        stroke = strokes[i % len(strokes)]
+    for _ in range(num_events):
+        gender = random.choice(genders)
+        age_min, age_max = random.choice(age_ranges)
+        distance = random.choice(distances)
+        stroke = random.choice(strokes)
 
         event_id = create_event(db_path, gender, age_min, age_max, distance, stroke)
 
-        for heat_num in range(1, 6):  # 1 heat per event
+        num_heats = random.randint(1, 3)
+        for heat_num in range(1, num_heats + 1):
             heat_id = add_heat(db_path, event_id, heat_num)
 
-            for lane_num in range(1, 9):  # 8 lanes
-                swimmer_name = f"Swimmer {swimmer_id}"
-                lane_id = add_swimmer_to_lane(db_path, heat_id, lane_num, swimmer_name)
+            num_lanes = random.randint(4, 8)
+            used_lanes = random.sample(range(1, 9), num_lanes)
 
+            for lane_num in sorted(used_lanes):
+                swimmer_name = random_swimmer_name()
+                add_swimmer_to_lane(db_path, heat_id, lane_num, swimmer_name)
                 swimmer_id += 1
 
-    print("Simple test data generated.")
+    print(f"{num_events} realistic events generated without timing data.")
 
 
 # Define your path — change this to your preferred location
@@ -395,12 +436,13 @@ initialize_database_at_path(db_path)
 
 
 
-generate_simple_test_data(db_path)
+generate_realistic_test_data(db_path)
+
+rendered_all_timesheets(db_path)
+
+y = get_total_number_of_events(db_path)
+
+get_all_events(db_path)
 
 
-x = get_total_number_of_events(db_path)
-y = 1
-for x in range(1, x + 1):
-    rendered_timesheets(db_path,y)
-    y = y+1
-print("done") 
+
