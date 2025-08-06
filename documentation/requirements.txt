@@ -1,2 +1,5 @@
 pip install qrcode[pil]
 pip install pillow
+sudo apt install python3
+pip install flask
+

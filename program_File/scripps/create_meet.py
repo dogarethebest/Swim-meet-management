@@ -12,6 +12,8 @@ import shutil
 import zipfile
 import tempfile
 import os
+import threading
+import subprocess
 
 
 def full_state_dump(db_path: str, tag: str = ""):
@@ -138,6 +140,7 @@ def generate_qr_code(data: str, save_path: str):
     img.save(save_path)
 def initialize_database_at_path(db_path: str):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
@@ -509,6 +512,37 @@ def generate_realistic_test_data(db_path: str, num_events=10):
 
     print(f"{num_events} realistic events generated without timing data.")
 
+
+
+def start_WEB_UI(script_relative_path="../Web_ui/web_ui.py", max_retries=1):
+    # Get the absolute path to the web UI script, relative to this file
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.join(base_dir, script_relative_path)
+
+    def run_script():
+        retries = 0
+        while retries < max_retries:
+            try:
+                print(f"[WEB_UI] Launching: {script_path}")
+                result = subprocess.run(["python", script_path])
+                print(f"[WEB_UI] UI exited with code {result.returncode}")
+                if result.returncode == 0:
+                    break  # Clean exit
+            except Exception as e:
+                print(f"[WEB_UI] Error: {e}")
+            retries += 1
+            if retries < max_retries:
+                time.sleep(2)
+                print(f"[WEB_UI] Restarting (attempt {retries + 1}/{max_retries})...")
+            else:
+                print("[WEB_UI] Max retries reached. Not restarting.")
+
+    # Start in background
+    thread = threading.Thread(target=run_script, daemon=True)
+    thread.start()
+
+start_WEB_UI()
+# testing
 db_path = "Active_meet/swim_meet.db"
 
 initialize_database_at_path(db_path)

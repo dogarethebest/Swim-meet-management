@@ -4,5 +4,7 @@
   "version": "very early Dev stage  0.0.1",
   "author": "nicholas kitt",
   "release_date": "unreleased",
-  "features": "n/a"
+  "post_build_int": false,
+  "build_ID.":"n/a"
+
 }
