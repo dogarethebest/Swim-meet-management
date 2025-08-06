@@ -1,7 +1,0 @@
-	•	Added more detailed information to build_info.json, including data about the post-build initialization status.
-	•	Fixed minor bugs.
-	•	Started the initial development of the web-based view interface:
-	•	Preliminary designs have been created.
-	•	Early-stage code has been added in index.html and web_ui.py (using Flask ).
-
-This marks the beginning of the front-end integration work, with future updates to expand functionality and styling.
