@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Swim Meet Manager{% endblock %}
+
+{% block content %}
+<main class="container">
+  <div class="results-header">Swim Meet Results - August 2025</div>
+
+  <div class="filter-bar">
+    <input type="search" placeholder="Search events or swimmers..." />
+  </div>
+
+  <table class="results-table" aria-label="Swim Meet Results">
+    <thead>
+      <tr>
+        <th>Event Name</th>
+        <th>Swimmer Name</th>
+        <th>Time</th>
+        <th>Rank</th>
+        <th>Medal</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>50m Freestyle</td>
+        <td>John Doe</td>
+        <td>23.45</td>
+        <td>1</td>
+        <td>🥇</td>
+      </tr>
+      <tr>
+        <td>100m Backstroke</td>
+        <td>Jane Roe</td>
+        <td>58.32</td>
+        <td>2</td>
+        <td>🥈</td>
+      </tr>
+      <tr>
+        <td>200m Butterfly</td>
+        <td>Sam Smith</td>
+        <td>2:12.55</td>
+        <td>3</td>
+        <td>🥉</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+{% endblock %}

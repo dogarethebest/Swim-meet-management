@@ -1,9 +1,9 @@
 import qrcode
-import sqlite3
 from qrcode.constants import ERROR_CORRECT_H
+import sqlite3
 import hashlib
 import time
-from PIL import ImageDraw ,ImageFont ,Image
+from PIL import ImageDraw, ImageFont, Image
 import random
 import datetime
 import inspect
@@ -14,7 +14,20 @@ import tempfile
 import os
 import threading
 import subprocess
+import json
+import atexit
+import signal
+import sys
+from io import BytesIO
+import os
+import sqlite3
+import shutil
+from pyzbar.pyzbar import decode
+from PIL import Image
+import json
+from typing import List
 
+web_ui_proc = None
 
 def full_state_dump(db_path: str, tag: str = ""):
     # Timestamp and safe filename
@@ -119,25 +132,16 @@ def generate_time_based_id(input_text: str) -> str:
     timestamp = str(time.time())
     combined = input_text + timestamp
     return hashlib.sha256(combined.encode('utf-8')).hexdigest()[:16]
-def generate_qr_code(data: str, save_path: str):
-
-    # Create QR code object
+def generate_qr_image(data: str) -> Image.Image:
     qr = qrcode.QRCode(
         version=5,
         error_correction=ERROR_CORRECT_H,
         box_size=2,
         border=4,
     )
-
-    # Add data and make the QR code
     qr.add_data(data)
     qr.make(fit=True)
-
-    # Generate the image
-    img = qr.make_image(fill_color="black", back_color="white")
-    # Save to file
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    img.save(save_path)
+    return qr.make_image(fill_color="black", back_color="white").convert("RGBA")
 def initialize_database_at_path(db_path: str):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
@@ -231,6 +235,42 @@ def update_lane_times(db_path: str, lane_id: int, timer1: float, timer2: float, 
     """, (timer1, timer2, timer3, total_time, lane_id))
     conn.commit()
     conn.close()
+def save_teams_to_json(team_one, team_two, file_path="Active_meet/meta_data.json"):
+    """
+    Appends the team names to a JSON file at the specified file path.
+    
+    Args:
+        team_one (str): Name of the first team.
+        team_two (str): Name of the second team.
+        file_path (str): Path (including filename) where JSON should be saved.
+    """
+    # Make sure the directory exists
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+    # Load existing data if the file exists and contains valid JSON
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r') as f:
+                existing_data = json.load(f)
+                if not isinstance(existing_data, list):
+                    existing_data = [existing_data]
+        except (json.JSONDecodeError, IOError):
+            existing_data = []
+    else:
+        existing_data = []
+
+    # Append the new entry
+    new_entry = {
+        "team_one": team_one,
+        "team_two": team_two
+    }
+    existing_data.append(new_entry)
+
+    # Write updated data back to the file
+    with open(file_path, 'w') as f:
+        json.dump(existing_data, f, indent=4)
+
+    print(f"Appended team names to: {file_path}")
 
 def get_all_events(db_path: str):
     conn = sqlite3.connect(db_path)
@@ -400,14 +440,14 @@ def rendered_a_timesheets(db_path: str, event_id: int):
     font_path = os.path.join(base_dir, 'app_resources', 'arial.ttf')
 
     try:
-        font = ImageFont.truetype(font_path, 30)  # Bigger font size for clarity
+        font = ImageFont.truetype(font_path, 30)
     except IOError:
         font = ImageFont.load_default()
         print("Warning: 'arial.ttf' font not found, using default font.")
 
     margin_left = 30
     margin_top = 20
-    line_spacing = 50  # vertical space between lines
+    line_spacing = 50
 
     for heat in get_heats_for_event(db_path, event_id):
         heat_id = heat[0]
@@ -416,8 +456,7 @@ def rendered_a_timesheets(db_path: str, event_id: int):
         swimmers = get_swimmers_in_heat(db_path, heat_id)
 
         for lane_num in range(1, 9):
-            # Try to get swimmer in this lane
-            swimmer = next((s for s in swimmers if s[0] == lane_num), None)  # s[0] is lane_num
+            swimmer = next((s for s in swimmers if s[0] == lane_num), None)
 
             if swimmer:
                 _, swimmer_name, t1, t2, t3, total = swimmer
@@ -426,24 +465,18 @@ def rendered_a_timesheets(db_path: str, event_id: int):
                 swimmer_name = "Empty Lane"
                 lane_id = None
 
-            # Prepare the image background
             background = Image.new("RGBA", (bg_width, bg_height), (255, 255, 255, 255))
             draw = ImageDraw.Draw(background)
 
             if lane_id:
-                qr_code_data = f"Event ID: {event_id}, heat Id:{heat_id}, heat number:{heat_num}, lane id: {lane_id}, lane num:{lane_num},  swimmer name: {swimmer_name}"
-                generate_qr_code(qr_code_data, "Active_meet/temp/qr_code.png")
-                qr_path = "Active_meet/temp/qr_code.png"
-                if os.path.exists(qr_path):
-                    qr_code = Image.open(qr_path).convert("RGBA").resize((qr_size, qr_size))
-                    background.paste(qr_code, (15, 15), qr_code)
+                qr_code_data = json.dumps({"event_id": event_id,"heat_id": heat_id,"heat_num": heat_num,"lane_id": lane_id,"lane_num": lane_num,"swimmer_name": swimmer_name})
+                qr_img = generate_qr_image(qr_code_data).resize((qr_size, qr_size))
+                background.paste(qr_img, (15, 15), qr_img)
 
-            # Draw header texts
             margin_left_2 = margin_left + qr_size
             draw.text((margin_left_2, margin_top), f"Swimmer: {swimmer_name}", fill=(0, 0, 0), font=font)
             draw.text((margin_left_2, margin_top + line_spacing), f"Event: {event_id} | Heat: {heat_num} | Lane: {lane_num}", fill=(0, 0, 0), font=font)
 
-            # Draw timer lines even if empty
             line_y = margin_top + line_spacing * 2 - 10
             times_start_y = line_y + 30
             draw.text((margin_left, times_start_y), "Timer 1: ____________________", fill=(0, 0, 0), font=font)
@@ -451,12 +484,10 @@ def rendered_a_timesheets(db_path: str, event_id: int):
             draw.text((margin_left, times_start_y + 2 * line_spacing), "Timer 3: ____________________", fill=(0, 0, 0), font=font)
             draw.text((margin_left, times_start_y + 3 * line_spacing), "Total:   ____________________", fill=(0, 0, 0), font=font)
 
-            # Save output
             output_dir = f"Active_meet/Time_sheets/{event_id}/{heat_num}"
             os.makedirs(output_dir, exist_ok=True)
             output_path = os.path.join(output_dir, f"lane_{lane_num}_timesheet.png")
             background.save(output_path)
-
 def rendered_all_timesheets(db_path: str):
     number_of_events = get_total_number_of_events(db_path)
     x = number_of_events
@@ -512,22 +543,25 @@ def generate_realistic_test_data(db_path: str, num_events=10):
 
     print(f"{num_events} realistic events generated without timing data.")
 
-
-
-def start_WEB_UI(script_relative_path="../Web_ui/web_ui.py", max_retries=1):
-    # Get the absolute path to the web UI script, relative to this file
+def start_WEB_UI(script_relative_path=os.path.join('..', 'web_ui', 'web_ui.py'), max_retries=1):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(base_dir, script_relative_path)
 
     def run_script():
+        global web_ui_proc
         retries = 0
         while retries < max_retries:
             try:
                 print(f"[WEB_UI] Launching: {script_path}")
-                result = subprocess.run(["python", script_path])
-                print(f"[WEB_UI] UI exited with code {result.returncode}")
-                if result.returncode == 0:
-                    break  # Clean exit
+                # Start subprocess in new process group
+                web_ui_proc = subprocess.Popen(
+                    ["python3", script_path],
+                    preexec_fn=os.setsid
+                )
+                web_ui_proc.wait()
+                print(f"[WEB_UI] UI exited with code {web_ui_proc.returncode}")
+                if web_ui_proc.returncode == 0:
+                    break
             except Exception as e:
                 print(f"[WEB_UI] Error: {e}")
             retries += 1
@@ -537,15 +571,220 @@ def start_WEB_UI(script_relative_path="../Web_ui/web_ui.py", max_retries=1):
             else:
                 print("[WEB_UI] Max retries reached. Not restarting.")
 
-    # Start in background
     thread = threading.Thread(target=run_script, daemon=True)
     thread.start()
 
-start_WEB_UI()
-# testing
+    def cleanup():
+        global web_ui_proc
+        if web_ui_proc and web_ui_proc.poll() is None:  # Still running
+            print("[WEB_UI] Terminating subprocess...")
+            # Kill the entire process group
+            os.killpg(os.getpgid(web_ui_proc.pid), signal.SIGTERM)
+
+    atexit.register(cleanup)
+
+
+    """
+    Rebuilds a new SQLite database from available sources:
+    - Salvageable data in the damaged database
+    - QR codes in the timesheet images in `timesheet_dir`
+    """
+
+    print("Starting database rebuild process...")
+
+    # Backup the damaged database if it exists
+    if os.path.exists(damaged_db_path):
+        backup_path = damaged_db_path + ".bak"
+        shutil.copy(damaged_db_path, backup_path)
+        print(f"Backed up damaged database to: {backup_path}")
+    else:
+        print("No damaged database found. Rebuilding from scratch.")
+
+    # Step 1: Initialize new database
+    initialize_database_at_path(new_db_path)
+    print(f"Initialized new database at {new_db_path}")
+
+    # Step 2: Extract QR code data from timesheets
+    recovered_qr_data: List[dict] = []
+
+    print(f"Scanning timesheet directory: {timesheet_dir}")
+    for filename in os.listdir(timesheet_dir):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_path = os.path.join(timesheet_dir, filename)
+            try:
+                img = Image.open(image_path)
+                decoded = decode(img)
+                for item in decoded:
+                    raw_data = item.data.decode('utf-8')
+                    try:
+                        qr_dict = json.loads(raw_data)
+                        recovered_qr_data.append(qr_dict)
+                        print(f"Recovered from {filename}: {qr_dict}")
+                    except json.JSONDecodeError:
+                        print(f"Failed to decode JSON in {filename}")
+            except Exception as e:
+                print(f"Error reading {filename}: {e}")
+
+    print(f"Total recovered swimmers: {len(recovered_qr_data)}")
+
+    # Step 3: Insert recovered data into the new database
+    conn = sqlite3.connect(new_db_path)
+    cursor = conn.cursor()
+
+    # Track inserted IDs to avoid duplicates
+    event_cache = {}
+    heat_cache = {}
+
+    for entry in recovered_qr_data:
+        gender = entry.get("gender", "Unknown")
+        min_age = entry.get("min_age", 0)
+        max_age = entry.get("max_age", 99)
+        distance = entry.get("distance", 50)
+        stroke = entry.get("stroke", "freestyle")
+        event_id = entry["event_id"]
+        heat_num = entry["heat_num"]
+        lane_num = entry["lane_num"]
+        swimmer_name = entry["swimmer_name"]
+
+        # Insert event if not already inserted
+        if event_id not in event_cache:
+            cursor.execute("""
+                INSERT INTO events (id, gender, min_age, max_age, distance, stroke)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (event_id, gender, min_age, max_age, distance, stroke))
+            event_cache[event_id] = True
+
+        # Insert heat if not already inserted
+        heat_key = (event_id, heat_num)
+        if heat_key not in heat_cache:
+            cursor.execute("""
+                INSERT INTO heats (event_id, heat_num)
+                VALUES (?, ?)
+            """, (event_id, heat_num))
+            heat_id = cursor.lastrowid
+            heat_cache[heat_key] = heat_id
+        else:
+            heat_id = heat_cache[heat_key]
+
+        # Insert lane
+        cursor.execute("""
+            INSERT INTO lanes (heat_id, lane_num, swimmer_name)
+            VALUES (?, ?, ?)
+        """, (heat_id, lane_num, swimmer_name))
+
+    conn.commit()
+    conn.close()
+
+    print(f"Database rebuild complete. New database written to: {new_db_path}")
+def rebuild_database_from_qr(
+    damaged_db_path: str = "Active_meet/swim_meet.db",
+    new_db_path: str = "Active_meet/swim_meet_rebuilt.db",
+    timesheet_dir: str = "Active_meet/Time_sheets"
+):
+    """
+    Rebuilds a new SQLite database from QR codes embedded in timesheet images.
+
+    Args:
+        damaged_db_path (str): Path to the old/damaged database.
+        new_db_path (str): Path to create the new database.
+        timesheet_dir (str): Directory containing timesheet PNG/JPG images.
+    """
+    print("Starting database rebuild process...")
+
+    # Backup damaged database
+    if os.path.exists(damaged_db_path):
+        backup_path = damaged_db_path + ".bak"
+        shutil.copy(damaged_db_path, backup_path)
+        print(f"Backed up damaged database to: {backup_path}")
+    else:
+        print("No damaged database found — starting from scratch.")
+
+    # Initialize fresh database
+    initialize_database_at_path(new_db_path)
+    print(f"Initialized new database at {new_db_path}")
+
+    # Recover QR data
+    recovered_qr_data: List[dict] = []
+    print(f"Scanning timesheet directory: {timesheet_dir}")
+
+    for filename in os.listdir(timesheet_dir):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_path = os.path.join(timesheet_dir, filename)
+            try:
+                img = Image.open(image_path)
+                decoded = decode(img)
+                for item in decoded:
+                    raw_data = item.data.decode('utf-8')
+                    try:
+                        qr_dict = json.loads(raw_data)
+                        recovered_qr_data.append(qr_dict)
+                        print(f"Recovered from {filename}: {qr_dict}")
+                    except json.JSONDecodeError:
+                        print(f"Invalid QR JSON in {filename}")
+            except Exception as e:
+                print(f"Error reading {filename}: {e}")
+
+    print(f"Total recovered swimmers: {len(recovered_qr_data)}")
+
+    # Insert into database
+    conn = sqlite3.connect(new_db_path)
+    cursor = conn.cursor()
+
+    event_cache = {}
+    heat_cache = {}
+
+    for entry in recovered_qr_data:
+        event_id = entry.get("event_id")
+        heat_num = entry.get("heat_num")
+        lane_num = entry.get("lane_num")
+        swimmer_name = entry.get("swimmer_name", "Unknown Swimmer")
+
+        # Optional extra metadata
+        gender = entry.get("gender", "Boys")
+        age_min = entry.get("age_min", 0)
+        age_max = entry.get("age_max", 99)
+        distance = entry.get("distance", 50)
+        stroke = entry.get("stroke", "freestyle")
+
+        # Insert event if new
+        if event_id not in event_cache:
+            cursor.execute("""
+                INSERT INTO events (id, gender, age_min, age_max, distance, stroke)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (event_id, gender, age_min, age_max, distance, stroke))
+            event_cache[event_id] = True
+
+        # Insert heat if new
+        heat_key = (event_id, heat_num)
+        if heat_key not in heat_cache:
+            cursor.execute("""
+                INSERT INTO heats (event_id, heat_num)
+                VALUES (?, ?)
+            """, (event_id, heat_num))
+            heat_id = cursor.lastrowid
+            heat_cache[heat_key] = heat_id
+        else:
+            heat_id = heat_cache[heat_key]
+
+        # Insert lane/swimmer
+        cursor.execute("""
+            INSERT INTO lanes (heat_id, lane_num, swimmer_name)
+            VALUES (?, ?, ?)
+        """, (heat_id, lane_num, swimmer_name))
+
+    conn.commit()
+    conn.close()
+
+    print(f"Database rebuild complete. New database written to: {new_db_path}")
+
+
+#start_WEB_UI()
+
 db_path = "Active_meet/swim_meet.db"
 
 initialize_database_at_path(db_path)
+
+save_teams_to_json("example team, one", "example team two")
 
 generate_realistic_test_data(db_path)
 
@@ -555,5 +794,4 @@ y = get_total_number_of_events(db_path)
 
 get_all_events(db_path)
 
-full_state_dump(db_path,"done")
-
+full_state_dump(db_path,"done executing script")

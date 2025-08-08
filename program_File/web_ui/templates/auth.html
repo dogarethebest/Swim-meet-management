@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Swim Meet Manager{% endblock %}
+
+{% block content %}
+<main>
+  <section class="auth-card">
+    <h2>Login</h2>
+    <form onsubmit="event.preventDefault(); alert('Auth feature not implemented yet');">
+      <label for="email">Email</label>
+      <input id="email" type="email" required placeholder="your.email@example.com" />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" required placeholder="••••••••" />
+
+      <button type="submit">Login</button>
+    </form>
+    <div class="auth-links">
+      <a href="#">Sign Up</a> | <a href="#">Forgot Password?</a>
+    </div>
+  </section>
+</main>
+{% endblock %}

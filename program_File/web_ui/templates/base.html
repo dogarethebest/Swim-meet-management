@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Swim Meet Manager{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+</head>
+<body>
+  <nav>
+    <div class="logo">SwimMeet</div>
+    <ul>
+      <li><a href="{{ url_for('home') }}" class="{% if request.path == '/' %}active{% endif %}">Home</a></li>
+      <li><a href="{{ url_for('auth') }}" class="{% if request.path == '/auth' %}active{% endif %}">Login</a></li>
+      <li><a href="{{ url_for('results') }}" class="{% if request.path == '/results' %}active{% endif %}">Results</a></li>
+    </ul>
+  </nav>
+
+  {% block content %}{% endblock %}
+
+  <footer>
+    &copy; 2025 SwimMeet. All rights reserved.
+  </footer>
+</body>
+</html>

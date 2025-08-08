@@ -7,4 +7,4 @@ def home():
     return render_template('index.html', title='Swim Meet Management')
 
 if __name__ == '__main__':
-   app.run(host='100.70.61.9', port=5000, debug=True)
+    app.run(host='100.70.61.9', port=5000, debug=True)

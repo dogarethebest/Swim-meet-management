@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Swim Meet Manager{% endblock %}
+
+{% block content %}
+<main class="container">
+  <section class="hero-banner">
+    <div class="hero-overlay">
+      <button onclick="alert('Start New Meet - feature coming soon')">Start New Meet</button>
+      <button onclick="location.href='{{ url_for('results') }}'">View Results</button>
+    </div>
+  </section>
+
+  <section class="cards">
+    <div class="card">Upcoming Meets</div>
+    <div class="card">Quick Stats</div>
+    <div class="card">Manage Events</div>
+  </section>
+</main>
+{% endblock %}
