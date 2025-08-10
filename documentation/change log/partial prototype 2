@@ -2,4 +2,4 @@ added the ability to set names for each team in the meet saved as names in Jason
 
 when generating the QR codes, they are no longer written into a file. They are stored in ram. reduces The need for high speed storage and increases rendering speed
 
-
+caring for capturing the sign sheets via an extra printer scanner attached 
