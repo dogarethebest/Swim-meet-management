@@ -1,0 +1,126 @@
+Python Compilation & Build Pipeline Documentation
+=================================================
+
+Overview
+--------
+The build pipeline is designed to take a multi-file Python project and produce standalone binaries while leaving non-Python files intact. 
+It also manages versioning via a JSON file and supports both debug and release builds.
+
+Key Goals:
+1. Compile all .py files into native Linux binaries.
+2. Keep external data/config files unchanged and writable.
+3. Automatically increment build_id for each build.
+4. Provide separate debug and release builds.
+5. Run on Linux using Python 3 and standard Linux tools.
+
+Tools & Components
+------------------
+
+1. Nuitka
+----------
+Purpose: Compiles Python to C, then to a native executable.
+Key Features:
+- Real compilation → faster performance.
+- Can create standalone executables with dependencies included.
+- Supports debug (--debug) and optimized release (--lto + stripped symbols).
+- Can include non-Python directories (--include-data-dir) without modifying them.
+
+Installation:
+  pip install nuitka
+  sudo apt install g++
+
+Typical Command:
+  nuitka3 --standalone --follow-imports --include-data-dir=data=data main.py
+
+2. Version JSON
+---------------
+Purpose: Store build metadata and versioning information.
+
+Fields:
+{
+  "build_id": 0,
+  "project_name": "Project Name",
+  "version": "0.0.1",
+  "author": "Author Name",
+  "release_date": "unreleased",
+  "post_build_int": false,
+  "build_ID.": "build_0"
+}
+
+Pipeline Behavior:
+- Reads JSON at the start of the build.
+- Increments build_id.
+- Updates build_ID. to include the new build number.
+- Writes JSON back to disk.
+
+3. Bash Build Script (build.sh)
+-------------------------------
+Purpose: Automates compilation of Python files into binaries.
+
+Steps:
+1. Increment build ID (can also be done in Python).
+2. Clean old build output directories.
+3. Compile Python files to binaries with Nuitka.
+4. Copy included data folders (data/, config/, etc.) as-is.
+5. Create separate debug and release builds.
+
+Debug Build:
+- Includes debug symbols.
+- Retains logging and full traceback info.
+- Example: nuitka3 --standalone --follow-imports --debug main.py
+
+Release Build:
+- Optimized for performance.
+- Strips debug symbols.
+- Example: nuitka3 --standalone --follow-imports --lto main.py
+
+4. Python Pre-Build Script (prepare_build.py)
+---------------------------------------------
+Purpose:
+- Makes build.sh executable.
+- Updates JSON versioning automatically.
+- Can handle custom paths (including directories above the script).
+
+Behavior:
+1. Reads JSON file.
+2. Increments build_id.
+3. Updates build_ID. string.
+4. Saves JSON.
+5. Sets build.sh executable flag.
+
+Pipeline Workflow
+-----------------
+prepare_build.py → (update JSON & chmod build.sh)
+build.sh → (clean old build directories)
+           → (compile Python files with Nuitka)
+           → (copy data files)
+           → (produce debug/release binaries)
+output/ → contains debug/ and release/ directories
+
+Build ID Auto-Increment
+----------------------
+- Ensures every build is uniquely identified.
+- Stored in JSON under build_id.
+- build_ID. field can be used for logging, installers, or version display.
+
+Debug vs Release
+----------------
+Feature                | Debug                        | Release
+-----------------------|------------------------------|---------------------------
+Debug symbols          | Included                     | Stripped
+Logging                | Full                         | Optional
+Optimization           | Disabled                     | LTO/Optimized
+Nuitka Flag Example    | --debug                      | --lto + --remove-output
+
+Advantages
+----------
+- Python source code is compiled → harder to reverse-engineer.
+- Non-Python files remain untouched → writable, easy to update, or user-editable.
+- Fully automated versioning.
+- Supports Linux out-of-the-box.
+
+
+build_dirs.txt
+use this file to list any directories or files that need to be deleted before a build
+Such as debug data dialogues created during testing
+Debug files and things like that

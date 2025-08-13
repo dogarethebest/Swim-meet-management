@@ -2,6 +2,7 @@ pip install qrcode[pil]
 
 pip install pillow
 
+#HTML Web access
 pip install flask
 
 sudo apt install sane-utils
@@ -10,3 +11,7 @@ sudo apt install sane-utils
 /bin/python3 -m pip install pyinsane2
 
 sudo apt install python3-pip
+
+#compiler
+pip install nuitka
+sudo apt install g++  # Nuitka needs a C++ compiler

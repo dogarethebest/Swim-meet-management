@@ -1,0 +1,3 @@
+# Directories to clean
+
+# Individual files to clean
