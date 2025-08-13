@@ -6,10 +6,19 @@ from pathlib import Path
 import shutil
 
 # CONFIG
-build_sh_path = Path("build.sh")           # Path to build.sh (can go above)
-version_json_path = Path("../program_File/app_resources/build_info.json") # Path to version JSON
-cleanup_config_file = Path("build_dirs.txt") # Path to directories/files config file
+from pathlib import Path
 
+# Get the directory where this script is located
+script_dir = Path(__file__).parent.resolve()
+
+# Paths relative to the script location
+build_sh_path = (script_dir / "build.sh").resolve()
+version_json_path = (script_dir / "../program_File/app_resources/build_info.json").resolve()
+cleanup_config_file = (script_dir / "build_dirs.txt").resolve()
+
+print(f"build.sh path: {build_sh_path}")
+print(f"version JSON path: {version_json_path}")
+print(f"cleanup config path: {cleanup_config_file}")
 # STEP 1 — Make build.sh executable
 if build_sh_path.exists():
     st = os.stat(build_sh_path)
@@ -64,3 +73,22 @@ for p in cleanup_paths:
         print(f"Path does not exist, skipping: {path}")
 
 print("Pre-build cleanup complete.")
+
+import subprocess
+import sys
+from pathlib import Path
+
+# Path to build.sh (adjust if needed)
+script_dir = Path(__file__).parent.resolve()
+build_sh_path = script_dir / "build.sh"
+
+# Make sure build.sh exists
+if build_sh_path.exists():
+    print(f"Running {build_sh_path}...")
+    result = subprocess.run(["/bin/bash", str(build_sh_path)])
+    if result.returncode != 0:
+        print("build.sh failed!")
+        sys.exit(result.returncode)
+    print("build.sh finished successfully.")
+else:
+    print(f"{build_sh_path} not found. Skipping build.sh execution.")

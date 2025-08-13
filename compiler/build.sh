@@ -1,51 +1,79 @@
 #!/bin/bash
 
-# CONFIG
-ENTRY_POINT="main.py"           # Your main Python file
-OUTPUT_DIR="dist"               # Base output folder
-DATA_DIRS=("data" "config")     # Folders to keep unchanged
+# -------------------------------
+# Dynamically find script & app root
+# -------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="$SCRIPT_DIR/.."    # Adjust if main app folder is one level above
 
-# STEP 1 — Increment build_id
-echo "Incrementing build ID..."
-python3 << 'EOF'
-import re
-from pathlib import Path
+# -------------------------------
+# Configuration
+# -------------------------------
+ENTRY_POINT="$APP_ROOT/main.py"
+DATA_DIR="$APP_ROOT/data"       # Folder(s) to include in the build
+OUTPUT_DIR="$APP_ROOT/dist"     # Build output directory
 
-ver_file = Path("version.py")
-text = ver_file.read_text()
-new_text = re.sub(
-    r"(build_id\s*=\s*)(\d+)",
-    lambda m: f"{m.group(1)}{int(m.group(2))+1}",
-    text
-)
-ver_file.write_text(new_text)
-print("Updated:", ver_file.read_text().strip())
-EOF
+# -------------------------------
+# Check prerequisites
+# -------------------------------
+if ! command -v nuitka &> /dev/null; then
+    echo "Error: 'nuitka' command not found. Make sure Nuitka is installed and in PATH."
+    exit 1
+fi
 
-# STEP 2 — Clean old build
-echo "Cleaning old build..."
-rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
+if [ ! -f "$ENTRY_POINT" ]; then
+    echo "Error: Entry point $ENTRY_POINT does not exist."
+    exit 1
+fi
 
-# STEP 3 — Compile Debug Version
+echo "Script Directory: $SCRIPT_DIR"
+echo "App Root: $APP_ROOT"
+echo "Entry Point: $ENTRY_POINT"
+echo "Data Directory: $DATA_DIR"
+echo "Output Directory: $OUTPUT_DIR"
+
+# -------------------------------
+# Clean old builds
+# -------------------------------
+echo "Cleaning old build directories..."
+rm -rf "$OUTPUT_DIR/debug"
+rm -rf "$OUTPUT_DIR/release"
+
+# -------------------------------
+# Build Debug Version
+# -------------------------------
 DEBUG_DIR="$OUTPUT_DIR/debug"
-echo "Building debug version..."
 mkdir -p "$DEBUG_DIR"
-nuitka3 --standalone --follow-imports --debug \
+echo "Building debug version..."
+nuitka --standalone --follow-imports --debug \
     "$ENTRY_POINT" \
-    $(for dir in "${DATA_DIRS[@]}"; do echo --include-data-dir="$dir=$dir"; done) \
-    --output-dir="$DEBUG_DIR"
+    --include-data-dir="$DATA_DIR=data" \
+    --output-dir="$DEBUG_DIR" &> "$DEBUG_DIR/build.log"
 
-# STEP 4 — Compile Release Version
+if [ $? -ne 0 ]; then
+    echo "Debug build failed. Check $DEBUG_DIR/build.log"
+    exit 1
+fi
+
+# -------------------------------
+# Build Release Version
+# -------------------------------
 RELEASE_DIR="$OUTPUT_DIR/release"
-echo "Building release version..."
 mkdir -p "$RELEASE_DIR"
-nuitka3 --standalone --follow-imports --lto --remove-output \
+echo "Building release version..."
+nuitka --standalone --follow-imports --lto --remove-output \
     "$ENTRY_POINT" \
-    $(for dir in "${DATA_DIRS[@]}"; do echo --include-data-dir="$dir=$dir"; done) \
-    --output-dir="$RELEASE_DIR"
+    --include-data-dir="$DATA_DIR=data" \
+    --output-dir="$RELEASE_DIR" &> "$RELEASE_DIR/build.log"
 
-# STEP 5 — Done
+if [ $? -ne 0 ]; then
+    echo "Release build failed. Check $RELEASE_DIR/build.log"
+    exit 1
+fi
+
+# -------------------------------
+# Done
+# -------------------------------
 echo "Build complete!"
 echo "Debug build in: $DEBUG_DIR"
 echo "Release build in: $RELEASE_DIR"
