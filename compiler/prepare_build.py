@@ -6,9 +6,9 @@ from pathlib import Path
 import shutil
 
 # CONFIG
-build_sh_path = Path("../build.sh")           # Path to build.sh (can go above)
-version_json_path = Path("../my_version.json") # Path to version JSON
-cleanup_config_file = Path("../build_dirs.txt") # Path to directories/files config file
+build_sh_path = Path("build.sh")           # Path to build.sh (can go above)
+version_json_path = Path("../program_File/app_resources/build_info.json") # Path to version JSON
+cleanup_config_file = Path("build_dirs.txt") # Path to directories/files config file
 
 # STEP 1 — Make build.sh executable
 if build_sh_path.exists():
