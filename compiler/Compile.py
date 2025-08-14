@@ -5,14 +5,19 @@ import shutil
 from pathlib import Path
 import sys
 import tempfile
-import psutil
 
-def install_pyinstaller():
+# Automatically install psutil and PyInstaller if missing
+def install_package(package_name):
     try:
-        import PyInstaller  # noqa: F401
+        __import__(package_name)
     except ImportError:
-        print("PyInstaller not found. Installing...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "pyinstaller"], check=True)
+        print(f"{package_name} not found. Installing...")
+        subprocess.run([sys.executable, "-m", "pip", "install", package_name], check=True)
+
+install_package("psutil")
+install_package("PyInstaller")
+
+import psutil
 
 def clean_previous_builds(build_paths):
     """Remove old build artifacts."""
@@ -61,9 +66,6 @@ def main():
 
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    # Install PyInstaller
-    install_pyinstaller()
-
     # Estimate RAM usage
     required_ram = estimate_ram_required(project_dir)
     available_ram = psutil.virtual_memory().available
@@ -77,7 +79,7 @@ def main():
         temp_project_dir = temp_build_dir / "project"
         shutil.copytree(project_dir, temp_project_dir)
         project_dir = temp_project_dir
-        main_script = project_dir / config.get("main_script", "main.py")
+        main_script = project_dir / config.get("main_script", "entry.py")
     else:
         temp_build_dir = None
 
