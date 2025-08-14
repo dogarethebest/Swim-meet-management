@@ -53,7 +53,7 @@ def main():
     project_dir = Path(config.get("project_dir", ".")).resolve()
     build_dir = Path(config.get("build_dir", "dist")).resolve()
     binary_name = config.get("binary_name", "app")
-    main_script = project_dir / config.get("main_script", "main.py")
+    main_script = project_dir / config.get("main_script", "entry.py")
 
     if not main_script.exists():
         print(f"Main script {main_script} not found!")
