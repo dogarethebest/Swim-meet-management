@@ -1,9 +1,8 @@
 {
-    "build_id": 12,
+    "build_id": 23,
     "project_name": "swim meet management",
     "version": "very early Dev stage  0.0.1",
     "author": "nicholas kitt",
     "release_date": "unreleased",
-    "post_build_int": false,
-    "build_ID.": "build_12"
+    "post_build_int": false
 }
